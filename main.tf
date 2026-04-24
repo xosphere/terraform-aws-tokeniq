@@ -82,9 +82,10 @@ resource "aws_lambda_function" "ingest" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE_NAME          = aws_dynamodb_table.turns.name
-      DYNAMODB_SESSIONS_TABLE_NAME = aws_dynamodb_table.sessions.name
-      TOKENIQ_VERSION              = local.version
+      DYNAMODB_TABLE_NAME              = aws_dynamodb_table.turns.name
+      DYNAMODB_SESSIONS_TABLE_NAME     = aws_dynamodb_table.sessions.name
+      DYNAMODB_COMMIT_INDEX_TABLE_NAME = aws_dynamodb_table.commit_index.name
+      TOKENIQ_VERSION                  = local.version
     }
   }
 }
@@ -176,6 +177,15 @@ resource "aws_iam_role_policy" "ingest_lambda" {
         Resource = aws_dynamodb_table.sessions.arn
       },
       {
+        Sid    = "DynamoDBCommitIndex"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem"
+        ]
+        Resource = aws_dynamodb_table.commit_index.arn
+      },
+      {
         Sid    = "DLQSend"
         Effect = "Allow"
         Action = [
@@ -247,5 +257,18 @@ resource "aws_dynamodb_table" "sessions" {
 
   point_in_time_recovery {
     enabled = true
+  }
+}
+
+# ---- DynamoDB: Commit Index Table ----
+
+resource "aws_dynamodb_table" "commit_index" {
+  name         = "xosphere-tokeniq-commit-index"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "commit_sha"
+
+  attribute {
+    name = "commit_sha"
+    type = "S"
   }
 }
