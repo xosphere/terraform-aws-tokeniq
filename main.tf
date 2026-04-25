@@ -85,6 +85,7 @@ resource "aws_lambda_function" "ingest" {
       DYNAMODB_TABLE_NAME              = aws_dynamodb_table.turns.name
       DYNAMODB_SESSIONS_TABLE_NAME     = aws_dynamodb_table.sessions.name
       DYNAMODB_COMMIT_INDEX_TABLE_NAME = aws_dynamodb_table.commit_index.name
+      DYNAMODB_COMMIT_ATTR_TABLE_NAME  = aws_dynamodb_table.commit_attributions.name
       TOKENIQ_VERSION                  = local.version
     }
   }
@@ -163,9 +164,13 @@ resource "aws_iam_role_policy" "ingest_lambda" {
         Effect = "Allow"
         Action = [
           "dynamodb:BatchWriteItem",
-          "dynamodb:PutItem"
+          "dynamodb:PutItem",
+          "dynamodb:Query"
         ]
-        Resource = aws_dynamodb_table.turns.arn
+        Resource = [
+          aws_dynamodb_table.turns.arn,
+          "${aws_dynamodb_table.turns.arn}/index/*"
+        ]
       },
       {
         Sid    = "DynamoDBSessionsReadWrite"
@@ -184,6 +189,16 @@ resource "aws_iam_role_policy" "ingest_lambda" {
           "dynamodb:PutItem"
         ]
         Resource = aws_dynamodb_table.commit_index.arn
+      },
+      {
+        Sid    = "DynamoDBCommitAttributions"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Scan"
+        ]
+        Resource = aws_dynamodb_table.commit_attributions.arn
       },
       {
         Sid    = "DLQSend"
@@ -269,6 +284,19 @@ resource "aws_dynamodb_table" "commit_index" {
 
   attribute {
     name = "commit_sha"
+    type = "S"
+  }
+}
+
+# ---- DynamoDB: Commit Attributions Table ----
+
+resource "aws_dynamodb_table" "commit_attributions" {
+  name         = "xosphere-tokeniq-commit-attributions"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "short_sha"
+
+  attribute {
+    name = "short_sha"
     type = "S"
   }
 }
