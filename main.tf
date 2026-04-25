@@ -196,9 +196,13 @@ resource "aws_iam_role_policy" "ingest_lambda" {
         Action = [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
+          "dynamodb:Query",
           "dynamodb:Scan"
         ]
-        Resource = aws_dynamodb_table.commit_attributions.arn
+        Resource = [
+          aws_dynamodb_table.commit_attributions.arn,
+          "${aws_dynamodb_table.commit_attributions.arn}/index/*"
+        ]
       },
       {
         Sid    = "DLQSend"
@@ -298,5 +302,22 @@ resource "aws_dynamodb_table" "commit_attributions" {
   attribute {
     name = "short_sha"
     type = "S"
+  }
+
+  attribute {
+    name = "session_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "end_time"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "session_id-end_time-index"
+    hash_key        = "session_id"
+    range_key       = "end_time"
+    projection_type = "ALL"
   }
 }
