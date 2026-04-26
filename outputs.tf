@@ -17,3 +17,13 @@ output "ingest_lambda_arn" {
   description = "ARN of the ingest Lambda function"
   value       = aws_lambda_function.ingest.arn
 }
+
+output "dashboard_api_url" {
+  description = "Dashboard API endpoint URL (configure as Grafana JSON API data source)"
+  value       = var.grafana_enabled ? "https://${aws_apigatewayv2_api.dashboard[0].id}.execute-api.${data.aws_region.current.name}.amazonaws.com" : null
+}
+
+output "grafana_workspace_url" {
+  description = "Amazon Managed Grafana workspace URL"
+  value       = var.grafana_enabled ? aws_grafana_workspace.tokeniq[0].endpoint : null
+}

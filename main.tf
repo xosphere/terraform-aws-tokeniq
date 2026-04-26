@@ -1,5 +1,5 @@
 locals {
-  version               = var.version
+  version               = var.tokeniq_version
   release_bucket_prefix = "xosphere-io-releases-"
   lambda_s3_bucket      = "${local.release_bucket_prefix}${data.aws_region.current.name}"
   lambda_s3_key         = "tokeniq/ingest-lambda-${local.version}.zip"
