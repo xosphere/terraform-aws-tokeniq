@@ -21,3 +21,19 @@ variable "lambda_timeout" {
   type        = number
   default     = 60
 }
+
+variable "grafana_enabled" {
+  description = "Enable Grafana dashboard infrastructure (API Gateway + query Lambda + optional AMG workspace)"
+  type        = bool
+  default     = false
+}
+
+variable "grafana_auth_provider" {
+  description = "Authentication provider for Amazon Managed Grafana workspace"
+  type        = string
+  default     = "AWS_SSO"
+  validation {
+    condition     = contains(["AWS_SSO", "SAML"], var.grafana_auth_provider)
+    error_message = "Must be AWS_SSO or SAML."
+  }
+}
