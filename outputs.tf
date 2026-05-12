@@ -18,6 +18,16 @@ output "ingest_lambda_arn" {
   value       = aws_lambda_function.ingest.arn
 }
 
+output "plan_attributions_table_name" {
+  description = "DynamoDB table for plan attributions and time estimates"
+  value       = aws_dynamodb_table.plan_attributions.name
+}
+
+output "plan_analyzer_enabled" {
+  description = "Whether the plan-analyzer Lambda is deployed (requires anthropic_api_key)"
+  value       = local.has_anthropic_key
+}
+
 output "dashboard_api_url" {
   description = "Dashboard API endpoint URL (configure as Grafana JSON API data source)"
   value       = var.grafana_enabled ? "https://${aws_apigatewayv2_api.dashboard[0].id}.execute-api.${data.aws_region.current.name}.amazonaws.com" : null

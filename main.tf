@@ -3,6 +3,8 @@ locals {
   release_bucket_prefix = "xosphere-io-releases-"
   lambda_s3_bucket      = "${local.release_bucket_prefix}${data.aws_region.current.name}"
   lambda_s3_key         = "tokeniq/ingest-lambda-${local.version}.zip"
+  has_anthropic_key     = var.anthropic_api_key != ""
+  plan_queue_url        = local.has_anthropic_key ? aws_sqs_queue.plan_analysis[0].url : ""
 }
 
 data "aws_caller_identity" "current" {}
@@ -86,6 +88,8 @@ resource "aws_lambda_function" "ingest" {
       DYNAMODB_SESSIONS_TABLE_NAME     = aws_dynamodb_table.sessions.name
       DYNAMODB_COMMIT_INDEX_TABLE_NAME = aws_dynamodb_table.commit_index.name
       DYNAMODB_COMMIT_ATTR_TABLE_NAME  = aws_dynamodb_table.commit_attributions.name
+      DYNAMODB_PLAN_ATTR_TABLE_NAME    = aws_dynamodb_table.plan_attributions.name
+      SQS_PLAN_ANALYSIS_QUEUE_URL      = local.plan_queue_url
       TOKENIQ_VERSION                  = local.version
     }
   }
@@ -206,12 +210,33 @@ resource "aws_iam_role_policy" "ingest_lambda" {
         ]
       },
       {
+        Sid    = "DynamoDBPlanAttributions"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query"
+        ]
+        Resource = [
+          aws_dynamodb_table.plan_attributions.arn,
+          "${aws_dynamodb_table.plan_attributions.arn}/index/*"
+        ]
+      },
+      {
         Sid    = "DLQSend"
         Effect = "Allow"
         Action = [
           "sqs:SendMessage"
         ]
         Resource = aws_sqs_queue.ingest_dlq.arn
+      },
+      {
+        Sid    = "PlanAnalysisQueueSend"
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = "arn:aws:sqs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:xosphere-tokeniq-plan-analysis"
       }
     ]
   })
@@ -323,6 +348,179 @@ resource "aws_dynamodb_table" "commit_attributions" {
   }
 }
 
+# ---- DynamoDB: Plan Attributions Table ----
+
+resource "aws_dynamodb_table" "plan_attributions" {
+  name         = "xosphere-tokeniq-plan-attributions"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "plan_id"
+
+  attribute {
+    name = "plan_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "session_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "extracted_at"
+    type = "S"
+  }
+
+  attribute {
+    name = "analysis_status"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "session_id-extracted_at-index"
+    hash_key        = "session_id"
+    range_key       = "extracted_at"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "analysis_status-extracted_at-index"
+    hash_key        = "analysis_status"
+    range_key       = "extracted_at"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
+# ---- Plan Analysis Infrastructure (conditional on anthropic_api_key) ----
+
+resource "aws_secretsmanager_secret" "anthropic_api_key" {
+  count       = local.has_anthropic_key ? 1 : 0
+  name        = "xosphere-tokeniq-anthropic-api-key"
+  description = "Anthropic API key for TokenIQ plan time estimation"
+}
+
+resource "aws_secretsmanager_secret_version" "anthropic_api_key" {
+  count         = local.has_anthropic_key ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.anthropic_api_key[0].id
+  secret_string = jsonencode({ api_key = var.anthropic_api_key })
+}
+
+resource "aws_sqs_queue" "plan_analysis_dlq" {
+  count                     = local.has_anthropic_key ? 1 : 0
+  name                      = "xosphere-tokeniq-plan-analysis-dlq"
+  message_retention_seconds = 1209600
+}
+
+resource "aws_sqs_queue" "plan_analysis" {
+  count                      = local.has_anthropic_key ? 1 : 0
+  name                       = "xosphere-tokeniq-plan-analysis"
+  visibility_timeout_seconds = 120
+  message_retention_seconds  = 86400
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.plan_analysis_dlq[0].arn
+    maxReceiveCount     = 3
+  })
+}
+
+resource "aws_lambda_function" "plan_analyzer" {
+  count         = local.has_anthropic_key ? 1 : 0
+  function_name = "xosphere-tokeniq-plan-analyzer"
+  role          = aws_iam_role.plan_analyzer[0].arn
+  handler       = "bootstrap"
+  runtime       = "provided.al2023"
+  architectures = ["arm64"]
+  memory_size   = 256
+  timeout       = 120
+
+  s3_bucket = local.lambda_s3_bucket
+  s3_key    = "tokeniq/plan-analyzer-lambda-${local.version}.zip"
+
+  environment {
+    variables = {
+      DYNAMODB_PLAN_ATTR_TABLE_NAME = aws_dynamodb_table.plan_attributions.name
+      DYNAMODB_SESSIONS_TABLE_NAME  = aws_dynamodb_table.sessions.name
+      ANTHROPIC_API_KEY_SECRET_ID   = aws_secretsmanager_secret.anthropic_api_key[0].id
+      TOKENIQ_VERSION               = local.version
+    }
+  }
+}
+
+resource "aws_lambda_event_source_mapping" "plan_analyzer" {
+  count                   = local.has_anthropic_key ? 1 : 0
+  event_source_arn        = aws_sqs_queue.plan_analysis[0].arn
+  function_name           = aws_lambda_function.plan_analyzer[0].arn
+  batch_size              = 5
+  function_response_types = ["ReportBatchItemFailures"]
+}
+
+resource "aws_cloudwatch_log_group" "plan_analyzer" {
+  count             = local.has_anthropic_key ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.plan_analyzer[0].function_name}"
+  retention_in_days = 30
+}
+
+resource "aws_iam_role" "plan_analyzer" {
+  count = local.has_anthropic_key ? 1 : 0
+  name  = "xosphere-tokeniq-plan-analyzer-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "lambda.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "plan_analyzer" {
+  count = local.has_anthropic_key ? 1 : 0
+  name  = "xosphere-tokeniq-plan-analyzer-policy"
+  role  = aws_iam_role.plan_analyzer[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "CloudWatchLogs"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/xosphere-tokeniq-*"
+      },
+      {
+        Sid      = "SQSConsume"
+        Effect   = "Allow"
+        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+        Resource = aws_sqs_queue.plan_analysis[0].arn
+      },
+      {
+        Sid      = "DynamoDBPlanReadWrite"
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Resource = aws_dynamodb_table.plan_attributions.arn
+      },
+      {
+        Sid      = "DynamoDBSessionsUpdate"
+        Effect   = "Allow"
+        Action   = ["dynamodb:UpdateItem"]
+        Resource = aws_dynamodb_table.sessions.arn
+      },
+      {
+        Sid      = "SecretsManagerRead"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = aws_secretsmanager_secret.anthropic_api_key[0].arn
+      }
+    ]
+  })
+}
+
 # ---- Grafana Dashboard Infrastructure (conditional) ----
 
 resource "aws_lambda_function" "dashboard_api" {
@@ -344,6 +542,7 @@ resource "aws_lambda_function" "dashboard_api" {
       DYNAMODB_SESSIONS_TABLE_NAME     = aws_dynamodb_table.sessions.name
       DYNAMODB_COMMIT_INDEX_TABLE_NAME = aws_dynamodb_table.commit_index.name
       DYNAMODB_COMMIT_ATTR_TABLE_NAME  = aws_dynamodb_table.commit_attributions.name
+      DYNAMODB_PLAN_ATTR_TABLE_NAME    = aws_dynamodb_table.plan_attributions.name
       TOKENIQ_VERSION                  = local.version
     }
   }
@@ -404,7 +603,9 @@ resource "aws_iam_role_policy" "dashboard_api" {
           "${aws_dynamodb_table.turns.arn}/index/*",
           aws_dynamodb_table.sessions.arn,
           aws_dynamodb_table.commit_attributions.arn,
-          "${aws_dynamodb_table.commit_attributions.arn}/index/*"
+          "${aws_dynamodb_table.commit_attributions.arn}/index/*",
+          aws_dynamodb_table.plan_attributions.arn,
+          "${aws_dynamodb_table.plan_attributions.arn}/index/*"
         ]
       }
     ]

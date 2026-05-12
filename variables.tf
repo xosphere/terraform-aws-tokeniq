@@ -22,6 +22,13 @@ variable "lambda_timeout" {
   default     = 60
 }
 
+variable "anthropic_api_key" {
+  description = "Anthropic API key for plan time estimation. When provided, the plan-analyzer Lambda is deployed."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "grafana_enabled" {
   description = "Enable Grafana dashboard infrastructure (API Gateway + query Lambda + optional AMG workspace)"
   type        = bool
