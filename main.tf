@@ -5,6 +5,7 @@ locals {
   lambda_s3_key         = "tokeniq/ingest-lambda-${local.version}.zip"
   has_anthropic_key     = var.anthropic_api_key != ""
   plan_queue_url        = local.has_anthropic_key ? aws_sqs_queue.plan_analysis[0].url : ""
+  plan_analyzer_has_vpc = length(var.plan_analyzer_vpc_subnet_ids) > 0
 }
 
 data "aws_caller_identity" "current" {}
@@ -444,7 +445,16 @@ resource "aws_lambda_function" "plan_analyzer" {
       DYNAMODB_PLAN_ATTR_TABLE_NAME = aws_dynamodb_table.plan_attributions.name
       DYNAMODB_SESSIONS_TABLE_NAME  = aws_dynamodb_table.sessions.name
       ANTHROPIC_API_KEY_SECRET_ID   = aws_secretsmanager_secret.anthropic_api_key[0].id
+      ANTHROPIC_API_URL             = var.anthropic_api_url
       TOKENIQ_VERSION               = local.version
+    }
+  }
+
+  dynamic "vpc_config" {
+    for_each = local.plan_analyzer_has_vpc ? [1] : []
+    content {
+      subnet_ids         = var.plan_analyzer_vpc_subnet_ids
+      security_group_ids = var.plan_analyzer_vpc_security_group_ids
     }
   }
 }
@@ -516,6 +526,16 @@ resource "aws_iam_role_policy" "plan_analyzer" {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
         Resource = aws_secretsmanager_secret.anthropic_api_key[0].arn
+      },
+      {
+        Sid    = "VpcNetworkInterface"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DeleteNetworkInterface"
+        ]
+        Resource = "*"
       }
     ]
   })
