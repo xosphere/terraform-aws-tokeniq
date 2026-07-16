@@ -49,6 +49,11 @@ output "collector_execution_role_arn" {
   value       = module.services.collector_execution_role_arn
 }
 
+output "codecommit_cross_account_event_bus_arn" {
+  description = "ARN of the custom event bus the CodeCommit repo account must forward its events onto (create an EventBridge rule there targeting this ARN). Empty unless the cross-account CodeCommit intake is enabled."
+  value       = var.git_codecommit_intake_enabled && var.codecommit_account_id != "" ? module.intake_codecommit[0].cross_account_event_bus_arn : ""
+}
+
 output "enricher_execution_role_arn" {
   description = "Enricher ECS execution role ARN. When export is enabled, grant this role read on the vendor-hosted export tenant-key secret."
   value       = module.services.enricher_execution_role_arn

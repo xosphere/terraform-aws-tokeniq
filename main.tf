@@ -49,6 +49,35 @@ module "ingress" {
   collector_tls_key_secret_id  = module.core.collector_tls_key_secret_id
 }
 
+module "intake_litellm" {
+  count  = var.litellm_intake_enabled ? 1 : 0
+  source = "./modules/intake-litellm"
+
+  name_prefix           = var.name_prefix
+  litellm_events_bucket = var.litellm_events_bucket
+  litellm_events_prefix = var.litellm_events_prefix
+}
+
+module "intake_codecommit" {
+  count  = var.git_codecommit_intake_enabled ? 1 : 0
+  source = "./modules/intake-codecommit"
+
+  name_prefix           = var.name_prefix
+  codecommit_repos      = var.codecommit_repos
+  codecommit_account_id = var.codecommit_account_id
+}
+
+module "export" {
+  count  = var.export_privatelink_service_name != "" ? 1 : 0
+  source = "./modules/export"
+
+  name_prefix           = var.name_prefix
+  vpc_id                = var.vpc_id
+  subnet_ids            = var.private_subnet_ids
+  endpoint_service_name = var.export_privatelink_service_name
+  ingest_port           = var.export_privatelink_ingest_port
+}
+
 module "services" {
   source = "./modules/services"
 
@@ -104,6 +133,13 @@ module "services" {
 
   # --- Optional features ---
   price_book_url = var.price_book_url
+
+  litellm_intake_queue_url = var.litellm_intake_enabled ? module.intake_litellm[0].queue_url : ""
+  litellm_intake_queue_arn = var.litellm_intake_enabled ? module.intake_litellm[0].queue_arn : ""
+  litellm_events_bucket    = var.litellm_events_bucket
+
+  codecommit_intake_queue_url = var.git_codecommit_intake_enabled ? module.intake_codecommit[0].queue_url : ""
+  codecommit_intake_queue_arn = var.git_codecommit_intake_enabled ? module.intake_codecommit[0].queue_arn : ""
 
   git_github_backfill_enabled           = var.git_github_backfill_enabled
   git_github_app_id                     = var.git_github_app_id
