@@ -29,6 +29,26 @@ module "core" {
   kiro_tenant_key_version = var.kiro_tenant_key_version
 }
 
+module "ingress" {
+  source = "./modules/ingress"
+
+  name_prefix         = var.name_prefix
+  vpc_id              = var.vpc_id
+  subnet_ids          = var.internet_facing ? var.public_subnet_ids : var.private_subnet_ids
+  discovery_namespace = var.discovery_namespace
+
+  create_load_balancer  = var.create_load_balancer
+  internet_facing       = var.internet_facing
+  allowed_ingress_cidrs = var.allowed_ingress_cidrs
+  tls_mode              = var.tls_mode
+  acm_certificate_arn   = var.acm_certificate_arn
+  route53_zone_id       = var.route53_zone_id
+  dns_name              = var.dns_name
+
+  collector_tls_cert_secret_id = module.core.collector_tls_cert_secret_id
+  collector_tls_key_secret_id  = module.core.collector_tls_key_secret_id
+}
+
 module "services" {
   source = "./modules/services"
 
@@ -78,6 +98,9 @@ module "services" {
   data_service_auth_token_secret_arn  = module.core.data_service_auth_token_secret_arn
   data_service_tls_cert_secret_arn    = module.core.data_service_tls_cert_secret_arn
   data_service_tls_key_secret_arn     = module.core.data_service_tls_key_secret_arn
+
+  # --- Ingress wiring ---
+  collector_target_group_arn = module.ingress.target_group_arn
 
   # --- Optional features ---
   price_book_url = var.price_book_url
