@@ -123,6 +123,61 @@ variable "kiro_tenant_key_version" {
   default     = 1
 }
 
+# --- Ingress ---
+
+variable "create_load_balancer" {
+  description = "Create an NLB in front of the collector. false = in-VPC service-discovery access only (clients must resolve Cloud Map private DNS)."
+  type        = bool
+  default     = true
+}
+
+variable "internet_facing" {
+  description = "Make the collector NLB internet-facing. STRONGLY consider keeping this false and reaching the collector over a VPN/DirectConnect instead: the collector authenticates every request, but an internal NLB removes the exposed surface entirely. true requires allowed_ingress_cidrs and public_subnet_ids."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.internet_facing || length(var.public_subnet_ids) > 0
+    error_message = "internet_facing requires public_subnet_ids for the NLB."
+  }
+}
+
+variable "public_subnet_ids" {
+  description = "Public subnets for the NLB when internet_facing. Unused otherwise."
+  type        = list(string)
+  default     = []
+}
+
+variable "allowed_ingress_cidrs" {
+  description = "CIDRs allowed to reach the collector NLB on 443. REQUIRED when internet_facing — scope to your developers' egress CIDRs, never 0.0.0.0/0. For an internal NLB, empty defaults to the VPC CIDR."
+  type        = list(string)
+  default     = []
+}
+
+variable "tls_mode" {
+  description = "\"acm\" (default): NLB TLS listener terminates with an ACM certificate — clients trust system roots, zero client TLS config (requires acm_certificate_arn + dns_name). \"self_signed\": no domain needed — NLB passes TCP through to the collector's generated self-signed cert; distribute the collector_ca_pem output to developers."
+  type        = string
+  default     = "acm"
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate for the NLB TLS listener (tls_mode = \"acm\"). Must cover dns_name."
+  type        = string
+  default     = ""
+}
+
+variable "route53_zone_id" {
+  description = "Route 53 hosted zone to create the collector alias record in. Empty skips DNS."
+  type        = string
+  default     = ""
+}
+
+variable "dns_name" {
+  description = "Fully qualified DNS name clients call the collector by (e.g. tokeniq.example.com)."
+  type        = string
+  default     = ""
+}
+
 # --- Pricing-at-ingest ---
 
 variable "price_book_url" {
