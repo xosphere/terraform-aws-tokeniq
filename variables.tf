@@ -186,6 +186,44 @@ variable "price_book_url" {
   default     = ""
 }
 
+# --- LiteLLM landing-zone intake (opt-in) ---
+
+variable "litellm_intake_enabled" {
+  description = "Create the LiteLLM collector intake (intake SQS queue, EventBridge rule, collector env + bucket read grant). Requires litellm_events_bucket. The customer's LiteLLM bucket itself is never created or modified — enable EventBridge notifications on it yourself."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.litellm_intake_enabled || var.litellm_events_bucket != ""
+    error_message = "litellm_intake_enabled requires litellm_events_bucket."
+  }
+}
+
+variable "litellm_events_bucket" {
+  description = "Name of your existing LiteLLM raw-events S3 bucket the collector reads announced objects from."
+  type        = string
+  default     = ""
+}
+
+variable "litellm_events_prefix" {
+  description = "Optional S3 key prefix (LiteLLM s3_path) to scope intake to LiteLLM objects when the bucket is shared. Empty ingests every Object Created event on the bucket."
+  type        = string
+  default     = ""
+}
+
+# --- CodeCommit live intake (opt-in) ---
+
+variable "git_codecommit_intake_enabled" {
+  description = "Enable the live CodeCommit push intake: an EventBridge rule (scoped to codecommit_repos) → SQS queue the collector consumes, recording a git push per branch push straight from the event. Requires a non-empty codecommit_repos."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.git_codecommit_intake_enabled || length(var.codecommit_repos) > 0
+    error_message = "git_codecommit_intake_enabled requires at least one repository in codecommit_repos."
+  }
+}
+
 # --- Git REST backfill (opt-in per provider) ---
 # Credentials are customer-supplied by secret ARN: the module never owns a PAT
 # or App key. Keep a provider OFF until its secret carries a value — ECS cannot
@@ -308,6 +346,18 @@ variable "export_tenant_key_secret_arn" {
   description = "ARN of this tenant's vendor-hosted HMAC key secret the exporters sign with. Empty disables export."
   type        = string
   default     = ""
+}
+
+variable "export_privatelink_service_name" {
+  description = "Vendor-published PrivateLink endpoint-service name (vpce-svc-...) for the hosted-plane ingest, shared during onboarding. Set to create the interface endpoint that makes export_endpoint resolve privately in-VPC. Empty skips PrivateLink (export then needs another route to the endpoint, e.g. NAT egress)."
+  type        = string
+  default     = ""
+}
+
+variable "export_privatelink_ingest_port" {
+  description = "Port the hosted-plane ingest listens on behind the PrivateLink endpoint. Must match the port in export_endpoint."
+  type        = number
+  default     = 8080
 }
 
 variable "export_identity_user_mode" {
