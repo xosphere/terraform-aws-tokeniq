@@ -73,6 +73,14 @@ resource "aws_ecs_task_definition" "gateway" {
         },
         { name = "TOKENIQ_BUNDLE_CACHE_PATH", value = "/tmp/bundle.signed.json" },
         {
+          # Fresh tasks have no disk cache; hold boot briefly for the
+          # first fetch so a deploy coinciding with a bundle-source blip
+          # never puts a configless gateway into service. Keep below the
+          # health-check grace period (60s).
+          name  = "TOKENIQ_BUNDLE_BOOT_WAIT"
+          value = var.bundle_boot_wait
+        },
+        {
           # Push each turn's telemetry envelope to the collector's
           # authenticated gateway-ingest endpoint. The collector verifies
           # the shared HMAC key injected below.
