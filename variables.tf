@@ -381,3 +381,119 @@ variable "export_identity_team_mode" {
     error_message = "export_identity_team_mode must be \"plaintext\" or \"pseudonymous\"."
   }
 }
+
+# --- Gateway (optional inference data plane) ---
+
+variable "gateway_enabled" {
+  description = "Deploy the TokenIQ Gateway next to the data plane. The gateway proxies LLM traffic (OpenAI-compatible + native Anthropic surfaces), enforces signed-bundle config (virtual keys, routing, budgets, policies), and pushes turn telemetry to the collector. Requires ingress tls_mode \"acm\": the telemetry client verifies the collector's certificate against system roots."
+  type        = bool
+  default     = false
+}
+
+variable "gateway_image_tag" {
+  description = "Tag for the gateway image (composed as <image_registry>/tokeniq-gateway:<tag>). Pin a released version; override gateway_image to pull from a different registry."
+  type        = string
+  default     = "latest"
+}
+
+variable "gateway_image" {
+  description = "Full gateway image reference, overriding the image_registry composition (e.g. \"xosphere/tokeniq-gateway:vX.Y.Z\" straight from Docker Hub)."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_alb_subnet_ids" {
+  description = "Subnets for the gateway ALB. Defaults to private_subnet_ids (internal ALB); set public subnets together with gateway_internal = false for an internet-facing gateway."
+  type        = list(string)
+  default     = []
+}
+
+variable "gateway_internal" {
+  description = "Whether the gateway ALB is internal. Internet-facing is an explicit opt-in."
+  type        = bool
+  default     = true
+}
+
+variable "gateway_allowed_ingress_cidrs" {
+  description = "CIDRs allowed to reach the gateway ALB (developer/VPN ranges; include the VPC CIDR when the session analyzer targets the gateway)."
+  type        = list(string)
+  default     = []
+}
+
+variable "gateway_certificate_arn" {
+  description = "ACM certificate for the gateway ALB HTTPS listener. Required when gateway_enabled."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_dns_name" {
+  description = "Hostname for the gateway alias record (with route53_zone_id). Optional."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_bundle_public_key" {
+  description = "Hex Ed25519 public key the gateway pins for bundle verification (from `tokeniq gateway init` or the hosted console). Required when gateway_enabled."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_bundle_url" {
+  description = "Bundle-source base URL. Empty creates a module-owned public-read S3 bucket (Tier 2 self-managed); set the hosted config-distributor URL for Tier 3 together with gateway_bundle_tenant_key_secret_arn."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_bundle_seed_path" {
+  description = "Local path to the signed bundle from `tokeniq gateway init`, published to the Tier 2 bucket on first apply (later publishes happen out-of-band and are never clobbered)."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_bundle_tenant_key_secret_arn" {
+  description = "Secrets Manager ARN of the tenant resolver key for the Tier 3 distributor bundle poll."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_bedrock_enabled" {
+  description = "Register the gateway's Bedrock serving adapter (the task role carries the invoke grant)."
+  type        = bool
+  default     = false
+}
+
+variable "gateway_bedrock_served_models" {
+  description = "Bedrock models the gateway may invoke: bare foundation-model IDs or full ARNs."
+  type        = list(string)
+  default     = []
+}
+
+variable "gateway_cpu" {
+  description = "Fargate CPU units for the gateway task."
+  type        = number
+  default     = 512
+}
+
+variable "gateway_memory" {
+  description = "Fargate memory (MiB) for the gateway task."
+  type        = number
+  default     = 1024
+}
+
+variable "gateway_desired_count" {
+  description = "Number of gateway tasks (stateless; scale freely)."
+  type        = number
+  default     = 1
+}
+
+variable "gateway_extra_environment" {
+  description = "Additional TOKENIQ_* environment for the gateway (never credentials)."
+  type        = map(string)
+  default     = {}
+}
+
+variable "gateway_extra_secrets" {
+  description = "Additional gateway container secrets as env-name => Secrets Manager ARN (provider API keys such as TOKENIQ_ANTHROPIC_API_KEY). Provider keys live only in the customer account — never in bundles or the hosted plane."
+  type        = map(string)
+  default     = {}
+}

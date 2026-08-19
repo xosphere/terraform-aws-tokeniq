@@ -58,3 +58,18 @@ output "enricher_execution_role_arn" {
   description = "Enricher ECS execution role ARN. When export is enabled, grant this role read on the vendor-hosted export tenant-key secret."
   value       = module.services.enricher_execution_role_arn
 }
+
+output "gateway_endpoint" {
+  description = "Base URL developers point ANTHROPIC_BASE_URL / OpenAI-compatible clients at. Empty when the gateway is disabled."
+  value       = var.gateway_enabled ? module.gateway[0].gateway_endpoint : ""
+}
+
+output "gateway_bundle_bucket" {
+  description = "Tier 2 bundle bucket the gateway polls (publish signed artifacts to v1/bundles/latest). Empty when the gateway is disabled or bundle_url points elsewhere."
+  value       = var.gateway_enabled ? module.gateway[0].bundle_bucket : ""
+}
+
+output "gateway_admin_token_secret_arn" {
+  description = "Secrets Manager ARN of the gateway admin console token. Empty when the gateway is disabled."
+  value       = var.gateway_enabled ? module.gateway[0].admin_token_secret_arn : ""
+}

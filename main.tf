@@ -162,3 +162,57 @@ module "services" {
   export_identity_user_mode    = var.export_identity_user_mode
   export_identity_team_mode    = var.export_identity_team_mode
 }
+
+module "gateway" {
+  count  = var.gateway_enabled ? 1 : 0
+  source = "./modules/gateway"
+
+  name_prefix        = var.name_prefix
+  vpc_id             = var.vpc_id
+  private_subnet_ids = var.private_subnet_ids
+  alb_subnet_ids     = length(var.gateway_alb_subnet_ids) > 0 ? var.gateway_alb_subnet_ids : var.private_subnet_ids
+  internal           = var.gateway_internal
+  cluster_arn        = local.cluster_arn
+
+  allowed_ingress_cidrs = var.gateway_allowed_ingress_cidrs
+  certificate_arn       = var.gateway_certificate_arn
+  route53_zone_id       = var.route53_zone_id
+  dns_name              = var.gateway_dns_name
+
+  image            = var.gateway_image != "" ? var.gateway_image : "${var.image_registry}/tokeniq-gateway:${var.gateway_image_tag}"
+  cpu              = var.gateway_cpu
+  memory           = var.gateway_memory
+  desired_count    = var.gateway_desired_count
+  cpu_architecture = "ARM64"
+
+  tenant_id                    = var.tenant_id
+  bundle_public_key            = var.gateway_bundle_public_key
+  bundle_url                   = var.gateway_bundle_url
+  bundle_seed_path             = var.gateway_bundle_seed_path
+  bundle_tenant_key_secret_arn = var.gateway_bundle_tenant_key_secret_arn
+
+  # Turn telemetry pushes to the collector's authenticated HTTP intake with
+  # the shared HMAC key both services read from modules/core. Requires the
+  # collector endpoint to present an ACM certificate (tls_mode = "acm") —
+  # the gateway's telemetry client trusts system roots only.
+  collector_endpoint              = module.ingress.collector_endpoint
+  telemetry_tenant_key_secret_arn = module.core.gateway_tenant_key_secret_arn
+
+  bedrock_enabled       = var.gateway_bedrock_enabled
+  bedrock_served_models = var.gateway_bedrock_served_models
+
+  log_retention_days = var.log_retention_days
+
+  extra_environment = var.gateway_extra_environment
+  extra_secrets     = var.gateway_extra_secrets
+}
+
+# The gateway's telemetry client verifies the collector's certificate
+# against system roots; a self-signed collector endpoint would fail every
+# telemetry push (turns would drop, requests would still serve).
+check "gateway_telemetry_tls" {
+  assert {
+    condition     = !var.gateway_enabled || !module.ingress.client_ca_required
+    error_message = "gateway_enabled requires ingress tls_mode = \"acm\" with a load balancer: the gateway's telemetry client cannot trust the self-signed collector certificate."
+  }
+}

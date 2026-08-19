@@ -38,6 +38,7 @@ customers instantiate only the root):
 | `modules/intake-litellm` | Optional LiteLLM log intake (EventBridge → SQS) |
 | `modules/intake-codecommit` | Optional CodeCommit live push intake |
 | `modules/export` | Optional PrivateLink endpoint to the hosted plane |
+| `modules/gateway` | Optional TokenIQ Gateway (ALB + ECS, signed-bundle config, telemetry push) |
 | `examples/` | Complete, deployable example configurations |
 
 ## Quick start
@@ -82,6 +83,39 @@ Two independent choices — reachability and TLS:
   required and must never be `0.0.0.0/0`.
 - `create_load_balancer = false` skips the NLB: in-VPC clients call the
   collector via Cloud Map DNS (`collector.tokeniq.local`).
+
+## Gateway (optional)
+
+Set `gateway_enabled = true` to deploy the TokenIQ Gateway next to the
+data plane: an ALB + Fargate service proxying LLM traffic (OpenAI-compatible
+and native Anthropic surfaces, including the Claude Code gateway protocol)
+with signed-bundle configuration — virtual keys, routing, budgets,
+policies. Requirements and wiring:
+
+- **Ingress must run `tls_mode = "acm"`.** The gateway pushes each turn's
+  telemetry to the collector endpoint over authenticated HTTP and its
+  client trusts system roots only; a `check` block flags self-signed
+  configurations. The shared HMAC key is provisioned by `modules/core`
+  and injected into both services automatically.
+- **Trust anchor + first bundle.** Run `tokeniq gateway init` locally, set
+  `gateway_bundle_public_key` to the printed public key, and point
+  `gateway_bundle_seed_path` at the signed artifact — the module creates a
+  versioned public-read bundle bucket (Tier 2), seeds it on first apply,
+  and never overwrites later out-of-band publishes. For the hosted
+  control plane (Tier 3), set `gateway_bundle_url` to the distributor URL
+  plus `gateway_bundle_tenant_key_secret_arn`; migration between tiers is
+  just those variables.
+- **Provider API keys stay in your account.** Create Secrets Manager
+  secrets and map them via `gateway_extra_secrets`
+  (`{ TOKENIQ_ANTHROPIC_API_KEY = "arn:..." }`). They never ride in
+  bundles or reach the hosted plane. Bedrock needs no key at all:
+  `gateway_bedrock_served_models` grants the task role invoke access.
+- Point developers' `ANTHROPIC_BASE_URL` (or OpenAI-compatible clients)
+  at the `gateway_endpoint` output; the admin console token lives in the
+  `gateway_admin_token_secret_arn` secret.
+
+See `examples/with-gateway` for a complete configuration and the
+`tokeniq` CLI's `docs/deploy-aws.md` for the worked walkthrough.
 
 ## Enrolling developers
 
