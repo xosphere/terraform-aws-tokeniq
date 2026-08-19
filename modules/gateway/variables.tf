@@ -182,3 +182,9 @@ variable "extra_secrets" {
   type        = map(string)
   default     = {}
 }
+
+variable "bundle_boot_wait" {
+  description = "How long a cache-less task holds boot for its first bundle fetch before starting configless (TOKENIQ_BUNDLE_BOOT_WAIT, Go duration). Keep below the ALB health-check grace period (60s). \"0s\" disables."
+  type        = string
+  default     = "45s"
+}
