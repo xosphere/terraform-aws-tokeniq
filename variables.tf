@@ -354,6 +354,12 @@ variable "export_privatelink_service_name" {
   default     = ""
 }
 
+variable "export_privatelink_service_region" {
+  description = "Region of the hosted plane's ingest endpoint service. Empty derives it from export_privatelink_service_name. A region other than this deployment's makes the interface endpoint connect cross-region (AWS PrivateLink cross-region connectivity), so the customer plane can run in a region the hosted plane supports, such as us-east-1 for a us-west-2 service."
+  type        = string
+  default     = ""
+}
+
 variable "export_privatelink_ingest_port" {
   description = "Port the hosted-plane ingest listens on behind the PrivateLink endpoint. Must match the port in export_endpoint."
   type        = number

@@ -75,6 +75,7 @@ module "export" {
   vpc_id                = var.vpc_id
   subnet_ids            = var.private_subnet_ids
   endpoint_service_name = var.export_privatelink_service_name
+  service_region        = var.export_privatelink_service_region
   ingest_port           = var.export_privatelink_ingest_port
 }
 

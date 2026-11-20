@@ -18,6 +18,12 @@ variable "endpoint_service_name" {
   type        = string
 }
 
+variable "service_region" {
+  description = "Region of the endpoint service. Empty derives it from endpoint_service_name (com.amazonaws.vpce.<region>.vpce-svc-...). When it differs from the deploy region, the interface endpoint connects cross-region (AWS PrivateLink cross-region connectivity; the provider must list this region in its supported Regions)."
+  type        = string
+  default     = ""
+}
+
 variable "ingest_port" {
   description = "Port the hosted-plane ingest service listens on behind the endpoint."
   type        = number
