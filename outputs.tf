@@ -69,6 +69,11 @@ output "gateway_bundle_bucket" {
   value       = var.gateway_enabled ? module.gateway[0].bundle_bucket : ""
 }
 
+output "gateway_redis_endpoint" {
+  description = "host:port of the bundled gateway Redis primary endpoint (the gateway's TOKENIQ_REDIS_ADDR). Empty when the gateway is disabled or gateway_redis_mode is \"none\"."
+  value       = var.gateway_enabled ? module.gateway[0].redis_endpoint : ""
+}
+
 output "gateway_admin_token_secret_arn" {
   description = "Secrets Manager ARN of the gateway admin console token. Empty when the gateway is disabled."
   value       = var.gateway_enabled ? module.gateway[0].admin_token_secret_arn : ""

@@ -149,6 +149,11 @@ module "tokeniq" {
   gateway_bundle_tenant_key_secret_arn = local.tenant_key_secret_arn
   gateway_bundle_public_key            = var.gateway_bundle_public_key
 
+  # Shared Redis for the gateway tasks: distributed rate limits, budgets,
+  # response cache. "bundled" (recommended) creates two cache.t4g.small
+  # Valkey nodes, about $37/month; "none" runs without Redis.
+  gateway_redis_mode = var.gateway_redis_mode
+
   # Provider keys stay in this account; bundles refer to them by name.
   gateway_extra_secrets = {
     TOKENIQ_ANTHROPIC_API_KEY = aws_secretsmanager_secret.anthropic_api_key.arn

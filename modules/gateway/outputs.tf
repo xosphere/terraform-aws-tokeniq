@@ -32,3 +32,8 @@ output "ecs_security_group_id" {
   description = "Security group of the gateway tasks (reference to allow gateway egress into other services)."
   value       = aws_security_group.ecs.id
 }
+
+output "redis_endpoint" {
+  description = "host:port of the bundled Redis primary endpoint (the gateway's TOKENIQ_REDIS_ADDR). Empty when redis_mode is \"none\"."
+  value       = local.redis_addr
+}

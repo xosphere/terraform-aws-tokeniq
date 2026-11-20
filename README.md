@@ -121,6 +121,43 @@ policies. Requirements and wiring:
 See `examples/with-gateway` for a complete configuration and the
 `tokeniq` CLI's `docs/deploy-aws.md` for the worked walkthrough.
 
+### Gateway Redis
+
+The gateway tasks share state through Redis. With it:
+
+- **rate limits are distributed**: enforced across every gateway task, not
+  per task (without Redis, N tasks allow N times the configured rate);
+- **budgets are enforced** (they are off without Redis);
+- **the response cache** is on and shared by all tasks;
+- **cost-estimator averages** are shared rather than per task;
+- **SSO `/login`** works with more than one gateway task, because the login
+  state survives the callback landing on a different task.
+
+`gateway_redis_mode` picks how the gateway gets it:
+
+| Mode | What you get |
+|---|---|
+| `"none"` (default) | No Redis. The gateway serves, with per-task rate limits, budgets off and no response cache. Existing installs are unchanged. |
+| `"bundled"` (recommended) | The module creates an ElastiCache replication group (Valkey by default) and sets the gateway's `TOKENIQ_REDIS_ADDR` to its primary endpoint. |
+
+The bundled Redis is a primary and a replica in different AZs with
+automatic failover (`gateway_redis_node_type`, default `cache.t4g.small`;
+`gateway_redis_engine` `"valkey"` or `"redis"`;
+`gateway_redis_engine_version`, default 8.0 for Valkey and 7.1 for Redis),
+encrypted at rest, with daily snapshots kept for one day. At the default
+size it costs about $37/month on-demand in us-east-1/us-west-2 for Valkey
+(about $47/month with `gateway_redis_engine = "redis"`). Changes such as a
+node-type change wait for the Sunday 05:00–06:00 UTC maintenance window.
+The `gateway_redis_endpoint` output shows the address.
+
+**Security model.** The gateway cannot yet speak TLS or AUTH to Redis, so
+the bundled Redis is **plaintext with no AUTH token**. Isolation is the
+network: it lives only in `private_subnet_ids`, and its security group
+admits TCP 6379 from the gateway tasks' security group and nothing else. Do
+not open that security group to anything else. Bringing your own Redis (for
+example an existing ElastiCache cluster with in-transit encryption and AUTH)
+is planned, together with TLS/AUTH support in the gateway.
+
 ## Hosted plane (Xosphere-managed)
 
 To deploy against Xosphere's hosted TokenIQ plane (metadata export over
@@ -192,6 +229,7 @@ All off by default; each turns on with a flag plus its settings (see
 | `kiro_tenant_key_secret_arn` | Where the tenant key lives — read out-of-band |
 | `collector_ca_pem` | CA to distribute in self-signed mode (sensitive) |
 | `nlb_dns_name` | Raw NLB DNS name (stable across redeploys) |
+| `gateway_redis_endpoint` | Bundled gateway Redis `host:port` (empty unless `gateway_redis_mode = "bundled"`) |
 
 ## Operational notes
 

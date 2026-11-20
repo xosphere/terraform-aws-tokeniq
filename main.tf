@@ -201,6 +201,14 @@ module "gateway" {
   bedrock_enabled       = var.gateway_bedrock_enabled
   bedrock_served_models = var.gateway_bedrock_served_models
 
+  # Shared state for the gateway tasks (rate limits, budgets, response
+  # cache). "bundled" creates an ElastiCache replication group reachable
+  # only from the gateway tasks; see modules/gateway/redis.tf.
+  redis_mode           = var.gateway_redis_mode
+  redis_node_type      = var.gateway_redis_node_type
+  redis_engine         = var.gateway_redis_engine
+  redis_engine_version = var.gateway_redis_engine_version
+
   log_retention_days = var.log_retention_days
 
   extra_environment = var.gateway_extra_environment
@@ -214,5 +222,14 @@ check "gateway_telemetry_tls" {
   assert {
     condition     = !var.gateway_enabled || !module.ingress.client_ca_required
     error_message = "gateway_enabled requires ingress tls_mode = \"acm\" with a load balancer: the gateway's telemetry client cannot trust the self-signed collector certificate."
+  }
+}
+
+# With bundled Redis the module owns TOKENIQ_REDIS_ADDR; a second value in
+# gateway_extra_environment would duplicate the container env var.
+check "gateway_redis_addr_owned" {
+  assert {
+    condition     = var.gateway_redis_mode != "bundled" || !contains(keys(var.gateway_extra_environment), "TOKENIQ_REDIS_ADDR")
+    error_message = "gateway_redis_mode = \"bundled\" sets TOKENIQ_REDIS_ADDR itself; remove it from gateway_extra_environment."
   }
 }

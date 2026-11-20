@@ -12,3 +12,8 @@ output "developer_onboarding_command" {
   description = "Command each developer runs to sync local agent sessions."
   value       = module.tokeniq.developer_onboarding_command
 }
+
+output "gateway_redis_endpoint" {
+  description = "Bundled gateway Redis host:port (empty when gateway_redis_mode is \"none\")."
+  value       = module.tokeniq.gateway_redis_endpoint
+}

@@ -66,6 +66,19 @@ To require the gateway organization-wide, use Claude Code managed settings:
 `{"allowedProviders":["customEndpoint"],"env":{"ANTHROPIC_BASE_URL":"https://<gateway_dns_name>"}}`
 (the URL must match exactly).
 
+## Gateway Redis
+
+The example deploys the gateway with bundled Redis
+(`gateway_redis_mode = "bundled"`, the recommended setting): a primary and
+a replica `cache.t4g.small` ElastiCache Valkey node in your private subnets,
+reachable only from the gateway tasks, about $37/month on-demand. It gives
+the gateway distributed rate limits, budgets, a shared response cache, and
+SSO `/login` across more than one gateway task. The first apply takes
+10–15 minutes longer while ElastiCache creates the nodes. Set
+`gateway_redis_mode = "none"` to run without Redis (per-task rate limits,
+budgets off, no response cache). See "Gateway Redis" in the module README
+for the security model.
+
 ## Identity
 
 User emails and team names are exported as-is (`identity_mode = "plaintext"`,

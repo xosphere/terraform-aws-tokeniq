@@ -183,6 +183,40 @@ variable "extra_secrets" {
   default     = {}
 }
 
+variable "redis_mode" {
+  description = "Shared Redis for the gateway tasks: \"none\" (no Redis: per-task rate limits, budgets off, no response cache) or \"bundled\" (a module-owned two-node ElastiCache replication group, plaintext in private subnets, reachable only from the gateway tasks)."
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "bundled"], var.redis_mode)
+    error_message = "redis_mode must be \"none\" or \"bundled\"."
+  }
+}
+
+variable "redis_node_type" {
+  description = "ElastiCache node type for the bundled Redis (two nodes: primary + replica)."
+  type        = string
+  default     = "cache.t4g.small"
+}
+
+variable "redis_engine" {
+  description = "Engine for the bundled Redis: \"valkey\" (default; Redis-compatible and cheaper per node-hour on ElastiCache) or \"redis\"."
+  type        = string
+  default     = "valkey"
+
+  validation {
+    condition     = contains(["valkey", "redis"], var.redis_engine)
+    error_message = "redis_engine must be \"valkey\" or \"redis\"."
+  }
+}
+
+variable "redis_engine_version" {
+  description = "Engine version for the bundled Redis. Empty picks the default for the engine: 8.0 for valkey, 7.1 for redis."
+  type        = string
+  default     = ""
+}
+
 variable "bundle_boot_wait" {
   description = "How long a cache-less task holds boot for its first bundle fetch before starting configless (TOKENIQ_BUNDLE_BOOT_WAIT, Go duration). Keep below the ALB health-check grace period (60s). \"0s\" disables."
   type        = string
