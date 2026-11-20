@@ -29,6 +29,15 @@ locals {
   codecommit_intake_enabled = var.codecommit_intake_queue_url != ""
   git_backfill_enabled      = var.git_github_backfill_enabled || var.git_gitlab_backfill_enabled || var.git_codecommit_backfill_enabled
 
+  # The export tenant key can be a vendor-hosted secret read cross-account
+  # (and possibly cross-region) by full ARN, encrypted under the vendor's
+  # CMK. Its kms:ViaService is Secrets Manager in the SECRET's region, which
+  # need not be this deployment's region.
+  export_kms_via_services = distinct([
+    "secretsmanager.${local.region}.amazonaws.com",
+    "secretsmanager.${try(split(":", var.export_tenant_key_secret_arn)[3], local.region)}.amazonaws.com",
+  ])
+
   codecommit_account = var.codecommit_account_id != "" ? var.codecommit_account_id : local.account_id
 
   # --- data-service storage layout ---

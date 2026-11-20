@@ -24,6 +24,17 @@ variable "tenant_id" {
   }
 }
 
+variable "hosted_tenant_key_secret_arn" {
+  description = "Your tenant key's secret ARN in Xosphere's account, shown in the TokenIQ console after you connect this AWS account (Configure TokenIQ → Connect your AWS account). Read cross-account; no copy is made. Empty (fallback only): create a local tokeniq/hosted-tenant-key secret and put the key Xosphere sends you into it."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.hosted_tenant_key_secret_arn == "" || can(regex("^arn:aws:secretsmanager:us-west-2:[0-9]{12}:secret:tokeniq/tenant/[0-9A-HJKMNP-TV-Z]{26}/hmac-key-[A-Za-z0-9]{6}$", var.hosted_tenant_key_secret_arn))
+    error_message = "hosted_tenant_key_secret_arn must be the full secret ARN the TokenIQ console shows (arn:aws:secretsmanager:us-west-2:<account>:secret:tokeniq/tenant/<tenant ID>/hmac-key-XXXXXX), or empty."
+  }
+}
+
 variable "public_zone_name" {
   description = "Public Route 53 zone used for ACM DNS validation (e.g. example.com)."
   type        = string
@@ -92,5 +103,5 @@ variable "image_tag" {
 variable "gateway_image_tag" {
   description = "Gateway image tag."
   type        = string
-  default     = "0.1.0"
+  default     = "0.2.0"
 }

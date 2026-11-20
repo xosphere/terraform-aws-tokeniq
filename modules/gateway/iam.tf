@@ -20,6 +20,17 @@ resource "aws_iam_role_policy_attachment" "execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+locals {
+  # The Tier 3 bundle tenant key is normally the vendor's own secret, read
+  # cross-account (and possibly cross-region) by full ARN and encrypted
+  # under the vendor's CMK. Decrypt then goes through Secrets Manager in the
+  # SECRET's region, which need not be this deployment's region.
+  bundle_key_kms_via_services = distinct([
+    "secretsmanager.${data.aws_region.current.name}.amazonaws.com",
+    "secretsmanager.${try(split(":", var.bundle_tenant_key_secret_arn)[3], data.aws_region.current.name)}.amazonaws.com",
+  ])
+}
+
 # The managed policy does not include Secrets Manager; grant read on
 # exactly the secrets injected as container secrets. The Tier 3 bundle
 # tenant key is granted whenever supplied even though its container-secret
@@ -30,20 +41,38 @@ resource "aws_iam_role_policy" "execution_secrets" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
-        Resource = concat(
-          [
-            var.telemetry_tenant_key_secret_arn,
-            aws_secretsmanager_secret.admin_token.arn,
-          ],
-          var.bundle_tenant_key_secret_arn != "" ? [var.bundle_tenant_key_secret_arn] : [],
-          values(var.extra_secrets),
-        )
-      }
-    ]
+    Statement = concat(
+      [
+        {
+          Effect = "Allow"
+          Action = ["secretsmanager:GetSecretValue"]
+          Resource = concat(
+            [
+              var.telemetry_tenant_key_secret_arn,
+              aws_secretsmanager_secret.admin_token.arn,
+            ],
+            var.bundle_tenant_key_secret_arn != "" ? [var.bundle_tenant_key_secret_arn] : [],
+            values(var.extra_secrets),
+          )
+        }
+      ],
+      # A customer-managed CMK (the vendor's, for the cross-account bundle
+      # tenant key) needs an explicit identity-side decrypt grant; ECS can't
+      # inject the secret without it. Module-owned secrets use the
+      # AWS-managed key and need none.
+      var.bundle_tenant_key_secret_arn != "" ? [
+        {
+          Effect   = "Allow"
+          Action   = "kms:Decrypt"
+          Resource = "*"
+          Condition = {
+            StringEquals = {
+              "kms:ViaService" = local.bundle_key_kms_via_services
+            }
+          }
+        }
+      ] : [],
+    )
   })
 }
 
