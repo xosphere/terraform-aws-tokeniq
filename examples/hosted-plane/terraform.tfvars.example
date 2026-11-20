@@ -1,0 +1,12 @@
+vpc_id             = "vpc-0123456789abcdef0"
+private_subnet_ids = ["subnet-0123456789abcdef0", "subnet-0fedcba9876543210"]
+
+tenant_id = "01ABCDEFGHJKMNPQRSTVWXYZ00"
+
+public_zone_name   = "example.com"
+collector_dns_name = "tokeniq-collector.example.com"
+gateway_dns_name   = "tokeniq-gateway.example.com"
+
+gateway_allowed_ingress_cidrs = ["10.0.0.0/8"]
+
+gateway_bundle_public_key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
