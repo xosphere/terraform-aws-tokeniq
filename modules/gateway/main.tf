@@ -127,6 +127,15 @@ resource "aws_ecs_task_definition" "gateway" {
             value = data.aws_region.current.name
           },
         ] : [],
+        local.redis_enabled ? [
+          {
+            # Bundled Redis (redis.tf): host:port of the replication
+            # group's primary endpoint, which follows failover. Plaintext,
+            # no AUTH (TGWY-248).
+            name  = "TOKENIQ_REDIS_ADDR"
+            value = local.redis_addr
+          },
+        ] : [],
         [for name, value in var.extra_environment : { name = name, value = value }],
       )
 

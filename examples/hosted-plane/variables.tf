@@ -105,3 +105,9 @@ variable "gateway_image_tag" {
   type        = string
   default     = "0.2.0"
 }
+
+variable "gateway_redis_mode" {
+  description = "Shared Redis for the gateway: \"bundled\" (recommended; a two-node ElastiCache Valkey replication group reachable only from the gateway, about $37/month) or \"none\" (per-task rate limits, budgets off, no response cache)."
+  type        = string
+  default     = "bundled"
+}

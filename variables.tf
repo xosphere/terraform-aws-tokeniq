@@ -486,6 +486,40 @@ variable "gateway_desired_count" {
   default     = 1
 }
 
+variable "gateway_redis_mode" {
+  description = "Shared Redis for the gateway: \"none\" (default; no Redis, so rate limits are per task, budgets are off and there is no response cache) or \"bundled\" (the module creates a two-node ElastiCache replication group in private_subnet_ids, plaintext with no AUTH, reachable only from the gateway tasks, and wires TOKENIQ_REDIS_ADDR). Bring-your-own Redis with TLS/AUTH is planned. Ignored when gateway_enabled is false."
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "bundled"], var.gateway_redis_mode)
+    error_message = "gateway_redis_mode must be \"none\" or \"bundled\"."
+  }
+}
+
+variable "gateway_redis_node_type" {
+  description = "ElastiCache node type for the bundled gateway Redis (two nodes: primary + replica)."
+  type        = string
+  default     = "cache.t4g.small"
+}
+
+variable "gateway_redis_engine" {
+  description = "Engine for the bundled gateway Redis: \"valkey\" (default; Redis-compatible, cheaper per node-hour) or \"redis\"."
+  type        = string
+  default     = "valkey"
+
+  validation {
+    condition     = contains(["valkey", "redis"], var.gateway_redis_engine)
+    error_message = "gateway_redis_engine must be \"valkey\" or \"redis\"."
+  }
+}
+
+variable "gateway_redis_engine_version" {
+  description = "Engine version for the bundled gateway Redis. Empty picks the default for the engine: 8.0 for valkey, 7.1 for redis."
+  type        = string
+  default     = ""
+}
+
 variable "gateway_extra_environment" {
   description = "Additional TOKENIQ_* environment for the gateway (never credentials)."
   type        = map(string)
