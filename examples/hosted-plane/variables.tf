@@ -1,5 +1,5 @@
 variable "region" {
-  description = "Region to deploy in. The hosted plane's ingest endpoint service is in us-west-2, and PrivateLink is regional."
+  description = "Region to deploy in: us-west-2, or us-east-1 (the hosted ingest service is in us-west-2; from us-east-1 the module connects over cross-region PrivateLink). Don't put the private subnets in use1-az3, where cross-region endpoints aren't supported."
   type        = string
   default     = "us-west-2"
 }
@@ -10,7 +10,7 @@ variable "vpc_id" {
 }
 
 variable "private_subnet_ids" {
-  description = "Two or more private subnets with NAT egress, in the ingest endpoint service's AZs: usw2-az1, usw2-az2 or usw2-az3 (AZ IDs, not names)."
+  description = "Two or more private subnets with NAT egress. In us-west-2 use the ingest service's AZ IDs (usw2-az1, usw2-az2 or usw2-az3); in us-east-1 any AZ except use1-az3 (cross-region PrivateLink)."
   type        = list(string)
 }
 

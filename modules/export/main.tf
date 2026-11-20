@@ -41,9 +41,21 @@ resource "aws_security_group" "export_endpoint" {
   }
 }
 
+data "aws_region" "current" {}
+
+locals {
+  # The service's own region: explicit, else parsed from its name.
+  service_region = var.service_region != "" ? var.service_region : try(regex("^com\\.amazonaws\\.vpce\\.([a-z0-9-]+)\\.vpce-svc-", var.endpoint_service_name)[0], "")
+  # TIQ-395: a service in another region is reached through cross-region PrivateLink. AWS
+  # doesn't support cross-region endpoint ENIs in some AZs (for example use1-az3); avoid
+  # those subnets. The deploying principal needs vpce:AllowMultiRegion.
+  cross_region = local.service_region != "" && local.service_region != data.aws_region.current.name
+}
+
 resource "aws_vpc_endpoint" "ingest" {
   vpc_id            = var.vpc_id
   service_name      = var.endpoint_service_name
+  service_region    = local.cross_region ? local.service_region : null
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.subnet_ids
 
