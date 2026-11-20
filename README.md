@@ -102,9 +102,13 @@ policies. Requirements and wiring:
   `gateway_bundle_seed_path` at the signed artifact — the module creates a
   versioned public-read bundle bucket (Tier 2), seeds it on first apply,
   and never overwrites later out-of-band publishes. For the hosted
-  control plane (Tier 3), set `gateway_bundle_url` to the distributor URL
-  plus `gateway_bundle_tenant_key_secret_arn`; migration between tiers is
-  just those variables.
+  control plane (Tier 3), set `gateway_bundle_url` to the distributor,
+  `https://tokeniq-bundles.xosphere.io`, plus
+  `gateway_bundle_tenant_key_secret_arn`, and set
+  `gateway_bundle_public_key` to your tenant's key from
+  `tokeniq gateway config signing-key --quiet` (it exists once the tenant
+  authors configuration in the console); migration between tiers is just
+  those variables.
 - **Provider API keys stay in your account.** Create Secrets Manager
   secrets and map them via `gateway_extra_secrets`
   (`{ TOKENIQ_ANTHROPIC_API_KEY = "arn:..." }`). They never ride in
