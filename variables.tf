@@ -439,7 +439,7 @@ variable "gateway_bundle_public_key" {
 }
 
 variable "gateway_bundle_url" {
-  description = "Bundle-source base URL. Empty creates a module-owned public-read S3 bucket (Tier 2 self-managed); set the hosted config-distributor URL for Tier 3 together with gateway_bundle_tenant_key_secret_arn."
+  description = "Bundle-source base URL. Empty creates a module-owned public-read S3 bucket (Tier 2 self-managed); set the hosted config distributor (https://tokeniq-bundles.xosphere.io) for Tier 3, together with gateway_bundle_tenant_key_secret_arn."
   type        = string
   default     = ""
 }
