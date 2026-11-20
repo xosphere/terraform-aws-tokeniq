@@ -10,11 +10,17 @@
 # collector and gateway DNS records, the PrivateLink interface endpoint and
 # all IAM.
 #
+# Your tenant key stays in Xosphere's account: connecting this AWS account
+# in the TokenIQ console grants it read access, and this deployment reads
+# the key cross-account by ARN (hosted_tenant_key_secret_arn).
+#
 # Order of a first install (README.md has the commands):
-#   1. Xosphere enables TokenIQ for your account and allow-lists this AWS
-#      account on its ingest endpoint service.
-#   2. terraform apply -target=aws_secretsmanager_secret.tenant_key -target=aws_secretsmanager_secret.anthropic_api_key
-#   3. Put the secret VALUES with the AWS CLI (never in Terraform state).
+#   1. In the TokenIQ console, Configure TokenIQ → Connect your AWS account:
+#      enter this AWS account ID. That grants it read of your tenant key and
+#      allow-lists it on the ingest endpoint service. Copy the tenant key ARN
+#      the console shows into hosted_tenant_key_secret_arn.
+#   2. terraform apply -target=aws_secretsmanager_secret.anthropic_api_key
+#   3. Put the Anthropic key VALUE with the AWS CLI (never in Terraform state).
 #   4. terraform apply
 
 provider "aws" {
@@ -72,20 +78,31 @@ resource "aws_acm_certificate_validation" "this" {
 
 # --- Secrets -----------------------------------------------------------------
 #
-# Terraform creates the secrets; you put their values with the AWS CLI so
-# they never land in Terraform state:
+# Terraform creates the Anthropic key secret; you put its value with the
+# AWS CLI so it never lands in Terraform state:
 #
-#   read -s TENANT_KEY && aws secretsmanager put-secret-value --secret-id tokeniq/hosted-tenant-key --secret-string "$TENANT_KEY"; unset TENANT_KEY
 #   read -s ANTHROPIC_KEY && aws secretsmanager put-secret-value --secret-id tokeniq/anthropic-api-key --secret-string "$ANTHROPIC_KEY"; unset ANTHROPIC_KEY
 #
-# Both use the default aws/secretsmanager key, which the module's roles can
+# It uses the default aws/secretsmanager key, which the module's roles can
 # decrypt.
+#
+# The tenant key (signs the metadata export and authenticates the gateway's
+# bundle downloads) is Xosphere's secret, read cross-account: the module
+# grants its roles kms:Decrypt via Secrets Manager for Xosphere's CMK.
 
-# The tenant key Xosphere gives you: signs the metadata export and
-# authenticates the gateway's bundle downloads.
+# FALLBACK ONLY, when hosted_tenant_key_secret_arn is empty: a local copy of
+# the tenant key that Xosphere hands over out of band. Put its value with
+#   read -s TENANT_KEY && aws secretsmanager put-secret-value --secret-id tokeniq/hosted-tenant-key --secret-string "$TENANT_KEY"; unset TENANT_KEY
+# Prefer the cross-account ARN: no key ever leaves Xosphere.
 resource "aws_secretsmanager_secret" "tenant_key" {
+  count = var.hosted_tenant_key_secret_arn == "" ? 1 : 0
+
   name        = "tokeniq/hosted-tenant-key"
   description = "TokenIQ hosted-plane tenant key (from Xosphere)"
+}
+
+locals {
+  tenant_key_secret_arn = var.hosted_tenant_key_secret_arn != "" ? var.hosted_tenant_key_secret_arn : aws_secretsmanager_secret.tenant_key[0].arn
 }
 
 resource "aws_secretsmanager_secret" "anthropic_api_key" {
@@ -116,7 +133,7 @@ module "tokeniq" {
   # the interface endpoint with private DNS, so the ingest hostname resolves
   # to it inside this VPC.
   export_endpoint                 = "https://tokeniq-ingest.xosphere.io:8080"
-  export_tenant_key_secret_arn    = aws_secretsmanager_secret.tenant_key.arn
+  export_tenant_key_secret_arn    = local.tenant_key_secret_arn
   export_privatelink_service_name = var.ingest_endpoint_service_name
   export_identity_user_mode       = var.identity_mode
   export_identity_team_mode       = var.identity_mode
@@ -129,7 +146,7 @@ module "tokeniq" {
   gateway_dns_name                     = var.gateway_dns_name
   gateway_allowed_ingress_cidrs        = var.gateway_allowed_ingress_cidrs
   gateway_bundle_url                   = "https://tokeniq-bundles.xosphere.io"
-  gateway_bundle_tenant_key_secret_arn = aws_secretsmanager_secret.tenant_key.arn
+  gateway_bundle_tenant_key_secret_arn = local.tenant_key_secret_arn
   gateway_bundle_public_key            = var.gateway_bundle_public_key
 
   # Provider keys stay in this account; bundles refer to them by name.

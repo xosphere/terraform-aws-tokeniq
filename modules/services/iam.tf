@@ -55,8 +55,9 @@ resource "aws_iam_role_policy" "collector_execution_secrets" {
           Resource = local.collector_secret_arns
         }
       ],
-      # The export tenant key may live under a customer CMK; module-owned
-      # secrets use the AWS-managed key (no explicit kms grant needed).
+      # The export tenant key may live under a customer CMK — including the
+      # vendor's, read cross-account; module-owned secrets use the
+      # AWS-managed key (no explicit kms grant needed).
       local.export_enabled ? [
         {
           Effect   = "Allow"
@@ -64,7 +65,7 @@ resource "aws_iam_role_policy" "collector_execution_secrets" {
           Resource = "*"
           Condition = {
             StringEquals = {
-              "kms:ViaService" = "secretsmanager.${local.region}.amazonaws.com"
+              "kms:ViaService" = local.export_kms_via_services
             }
           }
         }

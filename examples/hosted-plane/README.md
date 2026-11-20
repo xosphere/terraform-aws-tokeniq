@@ -7,16 +7,24 @@ in the TokenIQ console and delivered as signed bundles.
 
 Besides the module, it creates what a first install needs around it: ACM
 certificates for the collector and gateway (DNS-validated in a public Route 53
-zone) and the Secrets Manager secrets for your tenant key and Anthropic key.
+zone) and the Secrets Manager secret for your Anthropic key.
+
+Your **tenant key never leaves Xosphere**. Connecting your AWS account in the
+TokenIQ console grants that account read access to your tenant key secret in
+Xosphere's account; this deployment reads it cross-account by ARN
+(`hosted_tenant_key_secret_arn`), and the module grants its roles the
+`kms:Decrypt` (via Secrets Manager) that needs.
 
 ## Before you start
 
-From Xosphere:
+In the TokenIQ console, **Configure TokenIQ → Connect your AWS account** and
+enter the ID of the AWS account you're deploying into. That grants the account
+read access to your tenant key and allow-lists it on the ingest endpoint
+service. Then, from the console:
 
-- your **tenant ID** (`tenant_id`): your Xosphere account ID, shown in the console;
-- your **tenant key**, sent over a secure channel;
-- confirmation that your AWS account is **allow-listed** on the ingest endpoint service;
-- your **bundle-signing public key** (`gateway_bundle_public_key`), from the TokenIQ console or `tokeniq gateway config signing-key --quiet`.
+- your **tenant ID** (`tenant_id`): your Xosphere account ID;
+- your **tenant key ARN** (`hosted_tenant_key_secret_arn`), shown after you connect your AWS account; copy it exactly, including the 6-character suffix;
+- your **bundle-signing public key** (`gateway_bundle_public_key`), also from `tokeniq gateway config signing-key --quiet`.
 
 In your account (**us-west-2**):
 
@@ -30,14 +38,19 @@ In your account (**us-west-2**):
 ```sh
 cp terraform.tfvars.example terraform.tfvars   # fill it in
 terraform init
-terraform apply -target=aws_secretsmanager_secret.tenant_key -target=aws_secretsmanager_secret.anthropic_api_key
-read -s TENANT_KEY && aws secretsmanager put-secret-value --secret-id tokeniq/hosted-tenant-key --secret-string "$TENANT_KEY"; unset TENANT_KEY
+terraform apply -target=aws_secretsmanager_secret.anthropic_api_key
 read -s ANTHROPIC_KEY && aws secretsmanager put-secret-value --secret-id tokeniq/anthropic-api-key --secret-string "$ANTHROPIC_KEY"; unset ANTHROPIC_KEY
 terraform apply
 ```
 
 Services can restart for a few minutes on the first apply while their TLS
 material is created.
+
+Fallback, only if Xosphere asks you to: leave `hosted_tenant_key_secret_arn`
+empty and the example creates a local `tokeniq/hosted-tenant-key` secret
+instead. Create it with `-target=aws_secretsmanager_secret.tenant_key` in the
+first apply and put the tenant key Xosphere sends you into it with
+`aws secretsmanager put-secret-value`, the same way as the Anthropic key.
 
 ## Point Claude Code at the gateway
 

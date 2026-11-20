@@ -3,6 +3,11 @@ private_subnet_ids = ["subnet-0123456789abcdef0", "subnet-0fedcba9876543210"]
 
 tenant_id = "01ABCDEFGHJKMNPQRSTVWXYZ00"
 
+# From the TokenIQ console after you connect this AWS account
+# (Configure TokenIQ → Connect your AWS account). Copy it exactly,
+# including the 6-character suffix.
+hosted_tenant_key_secret_arn = "arn:aws:secretsmanager:us-west-2:143723790106:secret:tokeniq/tenant/01ABCDEFGHJKMNPQRSTVWXYZ00/hmac-key-AbC123"
+
 public_zone_name   = "example.com"
 collector_dns_name = "tokeniq-collector.example.com"
 gateway_dns_name   = "tokeniq-gateway.example.com"

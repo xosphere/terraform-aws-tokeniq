@@ -117,7 +117,7 @@ resource "aws_iam_role_policy" "enricher_execution_export_secrets" {
         Resource = "*"
         Condition = {
           StringEquals = {
-            "kms:ViaService" = "secretsmanager.${local.region}.amazonaws.com"
+            "kms:ViaService" = local.export_kms_via_services
           }
         }
       }

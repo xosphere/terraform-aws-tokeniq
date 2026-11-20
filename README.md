@@ -121,6 +121,18 @@ policies. Requirements and wiring:
 See `examples/with-gateway` for a complete configuration and the
 `tokeniq` CLI's `docs/deploy-aws.md` for the worked walkthrough.
 
+## Hosted plane (Xosphere-managed)
+
+To deploy against Xosphere's hosted TokenIQ plane (metadata export over
+PrivateLink, gateway config from signed bundles), start from
+`examples/hosted-plane`. Your tenant key stays in Xosphere's account:
+connect your AWS account in the TokenIQ console (Configure TokenIQ →
+Connect your AWS account) and it shows the tenant key's secret ARN. Pass
+that full ARN, unchanged, as both `export_tenant_key_secret_arn` and
+`gateway_bundle_tenant_key_secret_arn`; the module reads it cross-account
+and grants its execution roles `kms:Decrypt` via Secrets Manager for
+Xosphere's key. No copy of the key is made in your account.
+
 ## Enrolling developers
 
 1. Apply the module, then collect the enrollment materials:
