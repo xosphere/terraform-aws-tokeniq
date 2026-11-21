@@ -43,9 +43,15 @@ customers instantiate only the root):
 
 ## Quick start
 
+Works with Terraform (>= 1.11) and OpenTofu (1.12, 1.13; CI validates both). Write the
+source with its registry host, as below: the module is published on the Terraform
+Registry, not on registry.opentofu.org, so OpenTofu can't resolve the short form
+`xosphere/tokeniq/aws` ("Module not found"). With the host, both tools fetch it.
+
 ```hcl
 module "tokeniq" {
-  source = "xosphere/tokeniq/aws"
+  source  = "registry.terraform.io/xosphere/tokeniq/aws"
+  version = "0.1.3"
 
   vpc_id             = "vpc-..."
   private_subnet_ids = ["subnet-...", "subnet-..."]
