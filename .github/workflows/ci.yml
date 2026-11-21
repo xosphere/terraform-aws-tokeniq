@@ -31,3 +31,37 @@ jobs:
             terraform -chdir="$dir" init -backend=false -input=false
             terraform -chdir="$dir" validate
           done
+
+  # TIQ-409: customers run this module with OpenTofu too (the first one through Scalr), so
+  # validate it there as well. The module isn't on registry.opentofu.org, which is why
+  # consumers should write source = "registry.terraform.io/xosphere/tokeniq/aws" (README).
+  opentofu:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tofu: ["1.12.12", "1.13.9"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: ${{ matrix.tofu }}
+          tofu_wrapper: false
+
+      - name: tofu fmt
+        run: tofu fmt -check -recursive -diff
+
+      - name: tofu validate (root)
+        run: |
+          tofu init -backend=false -input=false
+          tofu validate
+
+      - name: tofu validate (examples)
+        run: |
+          for dir in examples/*/; do
+            [ -d "$dir" ] || continue
+            echo "==> $dir"
+            tofu -chdir="$dir" init -backend=false -input=false
+            tofu -chdir="$dir" validate
+          done
